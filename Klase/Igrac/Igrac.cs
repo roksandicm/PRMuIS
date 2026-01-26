@@ -8,6 +8,6 @@ namespace Klase.Igrac
 {
     public class Igrac
     {
-
+        public int id { get; set ; }
     }
 }
