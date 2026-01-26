@@ -7,4 +7,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Folder Include="Asocijacije\" />
+    <Folder Include="Anagram\" />
+    <Folder Include="Pitanja i odgovori\" />
+  </ItemGroup>
+
 </Project>
