@@ -1,6 +1,6 @@
-﻿namespace Projekat
+﻿namespace Client
 {
-    internal class Program
+    internal class Client
     {
         static void Main(string[] args)
         {
