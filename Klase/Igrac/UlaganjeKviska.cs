@@ -58,33 +58,37 @@ namespace Klase.Igrac
 
             while (odgovorili.Count < igraci.Count) // petlja radi dok god oba igraca nisu dala neki od odgovora hocu/necu
             {
-                List<Socket> spremni = new List<Socket>(igraci); // sadrzi podatke ko je dao odgovor
-
-                Socket.Select(spremni, null, null, 2000); // ceka 2ms
-
-                foreach (Socket s in spremni) 
+                foreach (Socket s in igraci) 
                 {
-                    brojBajta = s.Receive(buffer);
-                    Odgovor = Encoding.UTF8.GetString(buffer, 0, brojBajta).Trim().ToLower();
-
+            
                     if (odgovorili.Contains(s)) // ako je vec odgovorio ide se dalje i dodaje se odgovor
                         continue;
                      
-                    odgovorili.Add(s);
 
-                    if (Odgovor == "hocu")
+                    if(s.Available>0)
                     {
-                        if (s == igraci[0] && !Igrac1.kvisko)
-                            Igrac1.UloziKviska(indexIgre); // poziva se metoda da li sme
+                        brojBajta = s.Receive(buffer);
+                        Odgovor = Encoding.UTF8.GetString(buffer, 0, brojBajta).Trim().ToLower();
 
-                        if (s == igraci[1] && !Igrac2.kvisko)
-                            Igrac2.UloziKviska(indexIgre); // isto se poziva metoda da li sme samo za igraca 2
+
+                        odgovorili.Add(s);
+
+                        if (Odgovor == "hocu")
+                        {
+                            if (s == igraci[0] && !Igrac1.kvisko)
+                                Igrac1.UloziKviska(indexIgre); // poziva se metoda da li sme
+
+                            if (s == igraci[1] && !Igrac2.kvisko)
+                                Igrac2.UloziKviska(indexIgre); // isto se poziva metoda da li sme samo za igraca 2
+                        }
+                        else if (Odgovor == "necu")
+                        {
+                            Console.WriteLine("Nije uneo kvisko u toku ove igre!\n");
+                            continue;
+                        }
                     }
-                    else if(Odgovor=="necu")
-                    {
-                        Console.WriteLine("Nije uneo kvisko u toku ove igre!\n");
-                        continue;
-                    }
+
+             
                 }
             }
         }
