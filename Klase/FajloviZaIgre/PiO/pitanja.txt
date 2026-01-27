@@ -1,0 +1,31 @@
+Čovek ima pet čula.|t
+Pingvini mogu da lete.|n
+Vazduh ima masu.|t
+Zmije imaju noge.|n
+Saturn ima prstenove.|t
+Ljudi koriste samo 10 posto mozga.|n
+Biljke proizvode kiseonik.|t
+Delfini su ribe.|n
+Planeta Zemlja ima jedan Mesec.|t
+Staklo je uvek providno.|n
+Mravi mogu da nose teret teži od sebe.|t
+Sunce se okreće oko Zemlje.|n
+Čokolada je otrovna za pse.|t
+Ljudi imaju rep.|n
+Električna struja može da bude opasna.|t
+Ajkule nemaju kosti.|t
+Sve ptice mogu da lete.|n
+Sahara je najveća topla pustinja.|t
+Kamen može da pluta u vodi.|n
+Ljudi imaju više kostiju kao bebe nego kao odrasli.|t
+Munja nikada ne udara isto mesto dva puta.|n
+Krave mogu da lete.|n
+Zvuk ne može da se širi kroz vakuum.|t
+Čovek može da vidi infracrveno svetlo.|n
+Najveći organ kod čoveka je koža.|t
+Ribe zatvaraju oči kada spavaju.|n
+Voda se širi kada se smrzava.|t
+Svi sisari rađaju žive mlade.|n
+Med nikada ne može da se pokvari.|t
+Kenguri potiču iz Australije.|t
+Sunce je bliže Zemlji leti nego zimi.|n
