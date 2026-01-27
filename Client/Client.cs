@@ -14,7 +14,7 @@ namespace Client
         static void udpKonekcija()
         {
             Socket udpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            IPEndPoint targetEP = new IPEndPoint(IPAddress.Parse("192.168.0.3"), 51001);
+            IPEndPoint targetEP = new IPEndPoint(IPAddress.Loopback, 51001);
             EndPoint recEP = new IPEndPoint(IPAddress.Any, 0);
             byte[] Sendbuffer = new byte[1024];
             byte[] Recbuffer = new byte[1024];
@@ -64,7 +64,7 @@ namespace Client
         static void samoTrening()
         {
             Socket tcpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            IPEndPoint ep = new IPEndPoint(IPAddress.Parse("192.168.0.3"), 51001);
+            IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 51001);
             byte[] bufferRec = new byte[1024];
             byte[] bufferSent = new byte[1024];
             tcpSocket.Connect(ep);
