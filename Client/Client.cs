@@ -68,8 +68,6 @@ namespace Client
             byte[] bufferSent = new byte[1024];
             tcpSocket.Connect(ep);
 
-            byte[] bufferRec = new byte[1024];
-            byte[] bufferSent;
 
             
             int recByte = tcpSocket.Receive(bufferRec);
