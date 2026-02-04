@@ -94,7 +94,7 @@ namespace Projekat
         static void treningJedanIgrac()
         {
             Socket tcpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            IPEndPoint ep = new IPEndPoint(IPAddress.Any, 51001);
+            IPEndPoint ep = new IPEndPoint(IPAddress.Any, 51002);
             tcpSocket.Bind(ep);
             tcpSocket.Listen(1);
 

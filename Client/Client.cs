@@ -63,7 +63,7 @@ namespace Client
         static void samoTrening()
         {
             Socket tcpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 51001);
+            IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 51002);
             byte[] bufferRec = new byte[1024];
             byte[] bufferSent = new byte[1024];
             tcpSocket.Connect(ep);
