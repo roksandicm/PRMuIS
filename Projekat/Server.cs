@@ -18,6 +18,8 @@ namespace Projekat
         private static List<EndPoint> endPointIgraca = new List<EndPoint>();
         private static string baseDir = AppContext.BaseDirectory;
 
+        private static Dictionary<string, Igrac> tokenMap = new Dictionary<string, Igrac>();
+
         static void Main(string[] args)
         {
             udpKonekcija();
@@ -43,10 +45,17 @@ namespace Projekat
                     Console.WriteLine($"{sender}: {poruka}");
 
                     string[] deloviPoruke = poruka.Split(',');
+
                     if (deloviPoruke.Length == 1)
                     {
-                        igraci.Add(new Igrac(deloviPoruke[0]));
+                        Igrac novi = new Igrac(deloviPoruke[0]);
+                        igraci.Add(novi);
                         endPointIgraca.Add(sender);
+
+                        string token = Guid.NewGuid().ToString("N");
+                        tokenMap[token] = novi;
+                        string tokenMsg = "token," + token;
+                        udpSocket.SendTo(Encoding.UTF8.GetBytes(tokenMsg), sender);
 
                         if (igraci.Count == 2)
                         {
@@ -60,7 +69,8 @@ namespace Projekat
                             Console.WriteLine("-----------------------------------------------------------------\n");
                             Thread.Sleep(1500);
                             Console.Clear();
-                            igraDvaIgraca();
+
+                            igraDvaIgraca(); 
                             break;
                         }
                         else
@@ -109,7 +119,6 @@ namespace Projekat
             byte[] bufferRec = new byte[1024];
             string clientMsg = "";
 
-          
             while (clientMsg.ToUpper() != "START")
             {
                 int bytesRec = acceptSocket.Receive(bufferRec);
@@ -122,7 +131,6 @@ namespace Projekat
                 }
             }
 
-           
             msg = igrac.brojIgre.ToString();
             bufferSent = Encoding.UTF8.GetBytes(msg);
             acceptSocket.Send(bufferSent);
@@ -132,76 +140,81 @@ namespace Projekat
                 string nazIgre = igrac.GetIgra(i);
                 if (nazIgre == "an")
                 {
-                    msg = "ANAGRAM";
-                    bufferSent = Encoding.UTF8.GetBytes(msg);
-                    acceptSocket.Send(bufferSent);
-
-                    string putanja = Path.Combine(baseDir, "FajloviZaIgre", "Anagrami", "anagram2.txt");
-                    Anagram anagram = new Anagram(putanja);
-
-                   
-                    msg = anagram.REC;
-                    bufferSent = Encoding.UTF8.GetBytes(msg);
-                    acceptSocket.Send(bufferSent);
-
-                    Console.WriteLine("Pokrenuta igra ANAGRAM");
-                    Console.WriteLine("Glavna reč: " + anagram.REC);
-
-                    
-                    bool igraTraje = true;
-                    while (igraTraje)
+                    try
                     {
-                        // Ako su sve reči pogođene, završi igru automatski
-                        if (anagram.GetPogodjene() >= anagram.ponudjeneReci.Count)
+                        msg = "ANAGRAM";
+                        bufferSent = Encoding.UTF8.GetBytes(msg);
+                        acceptSocket.Send(bufferSent);
+
+                        string putanja = Path.Combine(baseDir, "FajloviZaIgre", "Anagrami", "anagram2.txt");
+                        Anagram anagram = new Anagram(putanja);
+
+                        Thread.Sleep(10);
+                        msg = anagram.REC;
+                        bufferSent = Encoding.UTF8.GetBytes(msg);
+                        acceptSocket.Send(bufferSent);
+
+                        Console.WriteLine("Pokrenuta igra ANAGRAM");
+                        Console.WriteLine("Glavna reč: " + anagram.REC);
+
+                        bool igraTraje = true;
+                        while (igraTraje)
                         {
-                            msg = $"KRAJ ANAGRAMA! Ukupno poeni: {igrac.brojPoenaTrenutno}";
-                            bufferSent = Encoding.UTF8.GetBytes(msg);
-                            acceptSocket.Send(bufferSent);
-                            Console.WriteLine("Igra je završena!");
-                            break; // automatski prekid
+                            if (anagram.GetPogodjene() >= anagram.ponudjeneReci.Count)
+                            {
+                                msg = $"KRAJ ANAGRAMA! Ukupno poeni: {igrac.brojPoenaTrenutno}";
+                                bufferSent = Encoding.UTF8.GetBytes(msg);
+                                acceptSocket.Send(bufferSent);
+                                Console.WriteLine("Igra je završena!");
+                                break;
+                            }
+
+                            int bytesRecOdgovor = acceptSocket.Receive(bufferRec);
+                            string odgovor = Encoding.UTF8.GetString(bufferRec, 0, bytesRecOdgovor).Trim();
+                            Console.WriteLine($"Odgovor klijenta: {odgovor}");
+
+                            if (odgovor.ToUpper() == "ODUSTAJEM" || odgovor.ToUpper() == "KRAJ")
+                            {
+                                msg = $"Odustali ste ili je kraj igre! Poeni: {igrac.brojPoenaTrenutno}";
+                                bufferSent = Encoding.UTF8.GetBytes(msg);
+                                acceptSocket.Send(bufferSent);
+                                break;
+                            }
+
+                            var rezultat = anagram.PostojiRec(odgovor, igrac.id);
+                            switch (rezultat)
+                            {
+                                case PovratneVrednostiAnagrama.IspravnaRec:
+                                    int poeni = odgovor.Replace(" ", "").Length;
+                                    igrac.brojPoenaTrenutno += poeni;
+                                    msg = $"TACNO! +{poeni} poena. Pogodjeno {anagram.GetPogodjene()}/{anagram.ponudjeneReci.Count}";
+                                    bufferSent = Encoding.UTF8.GetBytes(msg);
+                                    acceptSocket.Send(bufferSent);
+                                    break;
+
+                                case PovratneVrednostiAnagrama.NePostojiSlovo:
+                                    msg = "NETACNO! Uneli ste slovo koje ne postoji u glavnoj reci.";
+                                    bufferSent = Encoding.UTF8.GetBytes(msg);
+                                    acceptSocket.Send(bufferSent);
+                                    break;
+
+                                case PovratneVrednostiAnagrama.PreviseSlova:
+                                    msg = "NETACNO! Previše puta ste upotrebili neko slovo.";
+                                    bufferSent = Encoding.UTF8.GetBytes(msg);
+                                    acceptSocket.Send(bufferSent);
+                                    break;
+
+                                case PovratneVrednostiAnagrama.NeispravnaRec:
+                                    msg = "NETACNO! Ta reč nije predložena za ovaj anagram.";
+                                    bufferSent = Encoding.UTF8.GetBytes(msg);
+                                    acceptSocket.Send(bufferSent);
+                                    break;
+                            }
                         }
-
-                        int bytesRecOdgovor = acceptSocket.Receive(bufferRec);
-                        string odgovor = Encoding.UTF8.GetString(bufferRec, 0, bytesRecOdgovor).Trim();
-                        Console.WriteLine($"Odgovor klijenta: {odgovor}");
-
-                        if (odgovor.ToUpper() == "ODUSTAJEM" || odgovor.ToUpper() == "KRAJ")
-                        {
-                            msg = $"Odustali ste ili je kraj igre! Poeni: {igrac.brojPoenaTrenutno}";
-                            bufferSent = Encoding.UTF8.GetBytes(msg);
-                            acceptSocket.Send(bufferSent);
-                            break;
-                        }
-
-                        var rezultat = anagram.PostojiRec(odgovor, igrac.id);
-                        switch (rezultat)
-                        {
-                            case PovratneVrednostiAnagrama.IspravnaRec:
-                                int poeni = odgovor.Replace(" ", "").Length;
-                                igrac.brojPoenaTrenutno += poeni;
-                                msg = $"TACNO! +{poeni} poena. Pogodjeno {anagram.GetPogodjene()}/{anagram.ponudjeneReci.Count}";
-                                bufferSent = Encoding.UTF8.GetBytes(msg);
-                                acceptSocket.Send(bufferSent);
-                                break;
-
-                            case PovratneVrednostiAnagrama.NePostojiSlovo:
-                                msg = "NETACNO! Uneli ste slovo koje ne postoji u glavnoj reci.";
-                                bufferSent = Encoding.UTF8.GetBytes(msg);
-                                acceptSocket.Send(bufferSent);
-                                break;
-
-                            case PovratneVrednostiAnagrama.PreviseSlova:
-                                msg = "NETACNO! Previše puta ste upotrebili neko slovo.";
-                                bufferSent = Encoding.UTF8.GetBytes(msg);
-                                acceptSocket.Send(bufferSent);
-                                break;
-
-                            case PovratneVrednostiAnagrama.NeispravnaRec:
-                                msg = "NETACNO! Ta reč nije predložena za ovaj anagram.";
-                                bufferSent = Encoding.UTF8.GetBytes(msg);
-                                acceptSocket.Send(bufferSent);
-                                break;
-                        }
+                    }
+                    catch (SocketException e)
+                    {
+                        Console.WriteLine(e.ToString());
                     }
 
                     igrac.SacuvajPoene(i);
@@ -219,7 +232,103 @@ namespace Projekat
 
         static void igraDvaIgraca()
         {
-            Console.WriteLine("Igra sa dva igraca jos nije implementirana.");
+            int maxKlijenata = 2;
+
+            Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            serverSocket.Bind(new IPEndPoint(IPAddress.Any, 51002));
+            serverSocket.Listen(10);
+            serverSocket.Blocking = false;
+
+            Dictionary<Socket, Igrac> mapa = new Dictionary<Socket, Igrac>();
+            Dictionary<Socket, bool> ready = new Dictionary<Socket, bool>();
+            byte[] buffer = new byte[256];
+
+            while (true)
+            {
+                if (mapa.Count < maxKlijenata && serverSocket.Poll(1000 * 1000, SelectMode.SelectRead))
+                {
+                    Socket client = serverSocket.Accept();
+                    client.Blocking = true; 
+
+                    int n = 0;
+                    try { n = client.Receive(buffer); } catch { n = 0; }
+                    if (n == 0) { client.Close(); continue; }
+
+                    string first = Encoding.UTF8.GetString(buffer, 0, n).Trim();
+                    var parts = first.Split(',');
+
+                    if (parts.Length != 2 || !parts[0].Equals("token", StringComparison.OrdinalIgnoreCase))
+                    {
+                        client.Send(Encoding.UTF8.GetBytes("los_token"));
+                        client.Close();
+                        continue;
+                    }
+
+                    string token = parts[1].Trim();
+
+                    if (!tokenMap.TryGetValue(token, out Igrac ig))
+                    {
+                        client.Send(Encoding.UTF8.GetBytes("nepoznat_token"));
+                        client.Close();
+                        continue;
+                    }
+
+                    if (mapa.Values.Contains(ig))
+                    {
+                        client.Send(Encoding.UTF8.GetBytes("token_vec_koriscen"));
+                        client.Close();
+                        continue;
+                    }
+
+                    client.Blocking = false;
+                    mapa[client] = ig;
+                    ready[client] = false;
+
+                    Console.WriteLine($"SERVER: Povezan igrac {ig.nickname} {client.RemoteEndPoint}");
+                    client.Send(Encoding.UTF8.GetBytes("ok_token"));
+                }
+
+                foreach (var s in mapa.Keys.ToArray())
+                {
+                    if (!s.Poll(1000 * 1000, SelectMode.SelectRead))
+                        continue;
+
+                    int br = 0;
+                    try { br = s.Receive(buffer); } catch { br = 0; }
+
+                    if (br == 0)
+                    {
+                        Console.WriteLine($"SERVER: Igrac {mapa[s].nickname} se diskonektovao");
+                        try { s.Close(); } catch { }
+                        ready.Remove(s);
+                        mapa.Remove(s);
+                        continue;
+                    }
+
+                    string poruka = Encoding.UTF8.GetString(buffer, 0, br).Trim();
+
+                    if (poruka.Equals("start", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ready[s] = true;
+                        Console.WriteLine($"SERVER: {mapa[s].nickname} je spreman");
+                        s.Send(Encoding.UTF8.GetBytes("ok_start"));
+                    }
+                }
+
+                if (mapa.Count == maxKlijenata && ready.Count == maxKlijenata && ready.Values.All(v => v))
+                {
+                    Console.WriteLine("SERVER: Oba igraca spremna.");
+
+                    foreach (Socket s in mapa.Keys)
+                        s.Send(Encoding.UTF8.GetBytes("zapocinjem"));
+
+                    Thread.Sleep(1000);
+                    Console.Clear();
+                    break;
+                }
+
+                Thread.Sleep(50);
+            }
         }
     }
 }
