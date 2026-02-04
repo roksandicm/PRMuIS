@@ -12,7 +12,6 @@
     <Folder Include="FajloviZaIgre\Anagrami\" />
     <Folder Include="FajloviZaIgre\Asocijacije\" />
     <Folder Include="FajloviZaIgre\PiO\" />
-    <Folder Include="Pitanja i odgovori\" />
   </ItemGroup>
 
 </Project>
