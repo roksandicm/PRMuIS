@@ -159,41 +159,131 @@ namespace Client
             IPEndPoint TCPserverEP = new IPEndPoint(IPAddress.Loopback, 51002);
             TCPclientSocket.Connect(TCPserverEP);
 
+            byte[] buffer = new byte[2048];
+
+            // TOKEN
             if (string.IsNullOrWhiteSpace(multiplayerToken))
             {
-                Console.WriteLine("Greska: nije primljen token.");
+                Console.WriteLine("Greska: nije primljen token preko UDP-a.");
                 TCPclientSocket.Close();
                 return;
             }
 
-            string tokenMsg = "token," + multiplayerToken;
-            TCPclientSocket.Send(Encoding.UTF8.GetBytes(tokenMsg));
+            TCPclientSocket.Send(Encoding.UTF8.GetBytes("token," + multiplayerToken));
 
-            byte[] buffer = new byte[1024];
             int br = TCPclientSocket.Receive(buffer);
+            if (br == 0) { Console.WriteLine("Server zatvorio konekciju."); TCPclientSocket.Close(); return; }
+
             string resp = Encoding.UTF8.GetString(buffer, 0, br).Trim();
             if (resp != "ok_token")
             {
-                Console.WriteLine("Server je odbio token: " + resp);
+                Console.WriteLine("Server odbio token: " + resp);
                 TCPclientSocket.Close();
                 return;
             }
 
-            string poruka = "";
+            // START
+            string poruka;
             do
             {
                 Console.Write("Unesite \"START\" za pocetak kviza: ");
                 poruka = Console.ReadLine();
-            } while (poruka.ToLower() != "start");
+            } while (!poruka.Equals("START", StringComparison.OrdinalIgnoreCase));
 
-            TCPclientSocket.Send(Encoding.UTF8.GetBytes(poruka));
+            TCPclientSocket.Send(Encoding.UTF8.GetBytes("start"));
 
-            br = TCPclientSocket.Receive(buffer);
-            poruka = Encoding.UTF8.GetString(buffer, 0, br);
-            Console.WriteLine(poruka);
-            Console.WriteLine();
+            // cekaj zapocinjem
+            while (true)
+            {
+                br = TCPclientSocket.Receive(buffer);
+                if (br == 0) { Console.WriteLine("Server zatvorio konekciju."); TCPclientSocket.Close(); return; }
 
+                string msg = Encoding.UTF8.GetString(buffer, 0, br).Trim();
+                if (msg.Equals("zapocinjem", StringComparison.OrdinalIgnoreCase))
+                    break;
+
+                Console.WriteLine(msg);
+            }
+
+            Console.WriteLine("\nKviz pocinje!\n");
+
+            for (int game = 0; game < 3; game++)
+            {
+                br = TCPclientSocket.Receive(buffer);
+                if (br == 0) { Console.WriteLine("Server zatvorio konekciju."); TCPclientSocket.Close(); return; }
+
+                string igra = Encoding.UTF8.GetString(buffer, 0, br).Trim();
+                Console.WriteLine($"\n=== IGRA {game + 1}: {igra} ===\n");
+
+                // ANAGRAM
+                if (igra.Equals("ANAGRAM", StringComparison.OrdinalIgnoreCase))
+                {
+                    br = TCPclientSocket.Receive(buffer);
+                    if (br == 0) { Console.WriteLine("Server zatvorio konekciju."); TCPclientSocket.Close(); return; }
+
+                    string glavnaRec = Encoding.UTF8.GetString(buffer, 0, br).Trim();
+                    Console.WriteLine("Glavna rec: " + glavnaRec);
+                    Console.WriteLine("Kucaj reci (ili 'KRAJ' / 'ODUSTAJEM'):\n");
+
+                    bool jaZavrsio = false;
+
+                    while (true)
+                    {
+                        if (!jaZavrsio)
+                        {
+                            Console.Write("> ");
+                            string unos = Console.ReadLine();
+                            if (string.IsNullOrWhiteSpace(unos)) continue;
+
+                            try { TCPclientSocket.Send(Encoding.UTF8.GetBytes(unos)); }
+                            catch { Console.WriteLine("Pukla veza sa serverom."); TCPclientSocket.Close(); return; }
+
+                            if (unos.Equals("kraj", StringComparison.OrdinalIgnoreCase) ||
+                                unos.Equals("odustajem", StringComparison.OrdinalIgnoreCase))
+                            {
+                                jaZavrsio = true;
+                                Console.WriteLine("(Zavrsio si. Cekas drugog igraca...)");
+                            }
+                        }
+
+                        br = TCPclientSocket.Receive(buffer);
+                        if (br == 0) { Console.WriteLine("Server zatvorio konekciju."); TCPclientSocket.Close(); return; }
+
+                        string msg = Encoding.UTF8.GetString(buffer, 0, br).Trim();
+                        Console.WriteLine(msg);
+
+                        if (msg.StartsWith("KRAJ ANAGRAMA", StringComparison.OrdinalIgnoreCase))
+                            break;
+                    }
+
+                    Console.WriteLine("\n--- Kraj ANAGRAMA ---\n");
+                    continue;
+                }
+
+                if (igra.Equals("PITANJA", StringComparison.OrdinalIgnoreCase) ||
+                    igra.Equals("PITANJA I ODGOVORI", StringComparison.OrdinalIgnoreCase) ||
+                    igra.Equals("PO", StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine("PO nije implementiran u klijentu jos. (stub)");
+                    continue;
+                }
+
+                if (igra.Equals("ASOCIJACIJE", StringComparison.OrdinalIgnoreCase) ||
+                    igra.Equals("AS", StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine("AS nije implementiran u klijentu jos. (stub)");
+                    continue;
+                }
+
+                Console.WriteLine("Nepoznata igra: " + igra);
+            }
+
+            Console.WriteLine("\nKviz zavrsen!\n");
             TCPclientSocket.Close();
         }
+
+
+
+
     }
 }
