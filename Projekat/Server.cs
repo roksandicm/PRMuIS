@@ -314,7 +314,7 @@ namespace Projekat
                         s.Send(Encoding.UTF8.GetBytes("ok_start"));
                     }
                 }
-
+                
                 if (mapa.Count == maxKlijenata && ready.Count == maxKlijenata && ready.Values.All(v => v))
                 {
                     Console.WriteLine("SERVER: Oba igraca spremna.");
@@ -322,13 +322,176 @@ namespace Projekat
                     foreach (Socket s in mapa.Keys)
                         s.Send(Encoding.UTF8.GetBytes("zapocinjem"));
 
-                    Thread.Sleep(1000);
+                    Thread.Sleep(300);
                     Console.Clear();
-                    break;
+
+                    var lista = new List<Socket>(mapa.Keys);
+                    anagramDvaIgraca(lista, mapa);
+
+
+                    while (true) Thread.Sleep(1000); //ukloniti za impl drugih igara
                 }
 
                 Thread.Sleep(50);
             }
         }
+
+        static void anagramDvaIgraca(List<Socket> klijenti, Dictionary<Socket, Igrac> mapa)
+        {
+            string putanja = Path.Combine(baseDir, "FajloviZaIgre", "Anagrami", "anagram2.txt");
+
+            Dictionary<Socket, Anagram> anBySock = new Dictionary<Socket, Anagram>();
+            foreach (var s in klijenti)
+                anBySock[s] = new Anagram(putanja);
+
+            string glavna = anBySock[klijenti[0]].REC;
+
+            foreach (var s in klijenti) s.Send(Encoding.UTF8.GetBytes("ANAGRAM"));
+            Thread.Sleep(10);
+            foreach (var s in klijenti) s.Send(Encoding.UTF8.GetBytes(glavna));
+
+            Console.WriteLine("=== MULTI ANAGRAM ===");
+            Console.WriteLine("Glavna rec: " + glavna);
+
+            byte[] buf = new byte[1024];
+
+            int ukupno = anBySock[klijenti[0]].ponudjeneReci.Count;
+
+            Dictionary<string, Socket> prviPogodio = new Dictionary<string, Socket>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, int> brojBodovanja = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            int pogodjeneBarJednom = 0;
+
+            Dictionary<Socket, bool> zavrsio = new Dictionary<Socket, bool>();
+            foreach (var s in klijenti) zavrsio[s] = false;
+
+            while (true)
+            {
+                if (pogodjeneBarJednom >= ukupno)
+                {
+                    foreach (var s in klijenti)
+                        s.Send(Encoding.UTF8.GetBytes("Sve reci su pogodjene. Kraj anagrama."));
+                    break;
+                }
+
+                if (zavrsio.Values.All(x => x))
+                {
+                    foreach (var s in klijenti)
+                        s.Send(Encoding.UTF8.GetBytes("Oba igraca su zavrsila. Kraj anagrama."));
+                    break;
+                }
+
+                List<Socket> aktivni = new List<Socket>();
+                foreach (var s in klijenti)
+                    if (!zavrsio[s]) aktivni.Add(s);
+
+                if (aktivni.Count == 0) break;
+
+                Socket.Select(aktivni, null, null, 500 * 1000);
+
+                foreach (var s in aktivni)
+                {
+                    int n;
+                    try { n = s.Receive(buf); }
+                    catch { n = 0; }
+
+                    if (n == 0)
+                    {
+                        zavrsio[s] = true;
+                        foreach (var other in klijenti)
+                            if (other != s && !zavrsio[other])
+                                other.Send(Encoding.UTF8.GetBytes($"{mapa[s].nickname} se diskonektovao (racuna se kao ODUSTAJEM)."));
+                        continue;
+                    }
+
+                    string rec = Encoding.UTF8.GetString(buf, 0, n).Trim();
+                    if (string.IsNullOrWhiteSpace(rec)) continue;
+
+                    Igrac ig = mapa[s];
+                    Console.WriteLine($"{ig.nickname}: {rec}");
+
+                    if (rec.Equals("KRAJ", StringComparison.OrdinalIgnoreCase) ||
+                        rec.Equals("ODUSTAJEM", StringComparison.OrdinalIgnoreCase))
+                    {
+                        zavrsio[s] = true;
+                        s.Send(Encoding.UTF8.GetBytes("Zabelezeno: zavrsio si. Cekam da i drugi igrac posalje KRAJ/ODUSTAJEM."));
+
+                        foreach (var other in klijenti)
+                            if (other != s && !zavrsio[other])
+                                other.Send(Encoding.UTF8.GetBytes($"Protivnik ({ig.nickname}) je zavrsio. Ti mozes nastaviti ili ukucaj KRAJ/ODUSTAJEM."));
+
+                        continue;
+                    }
+
+                    var rez = anBySock[s].PostojiRec(rec, ig.id);
+
+                    string key = rec.Trim().ToUpperInvariant();
+                    if (!brojBodovanja.ContainsKey(key)) brojBodovanja[key] = 0;
+
+                    if (rez == PovratneVrednostiAnagrama.IspravnaRec)
+                    {
+                        int poeni = key.Replace(" ", "").Length;
+
+                        if (brojBodovanja[key] == 0)
+                        {
+                            brojBodovanja[key] = 1;
+                            prviPogodio[key] = s;
+                            pogodjeneBarJednom++;
+
+                            ig.brojPoenaTrenutno += poeni;
+                            s.Send(Encoding.UTF8.GetBytes($"TACNO! +{poeni} (prvi). {pogodjeneBarJednom}/{ukupno}"));
+                        }
+                        else if (brojBodovanja[key] == 1 && prviPogodio[key] != s)
+                        {
+                            int poeni2 = (int)Math.Floor(poeni * 0.85);
+                            brojBodovanja[key] = 2;
+
+                            ig.brojPoenaTrenutno += poeni2;
+                            s.Send(Encoding.UTF8.GetBytes($"TACNO, ali kasnije! +{poeni2} (15% manje)."));
+                        }
+                        else
+                        {
+                            s.Send(Encoding.UTF8.GetBytes("Vec si dobio poene za ovu rec."));
+                        }
+
+                        continue;
+                    }
+
+                    if (rez == PovratneVrednostiAnagrama.NePostojiSlovo)
+                        s.Send(Encoding.UTF8.GetBytes("NETACNO! Uneli ste slovo koje ne postoji u glavnoj reci."));
+                    else if (rez == PovratneVrednostiAnagrama.PreviseSlova)
+                        s.Send(Encoding.UTF8.GetBytes("NETACNO! Previše puta ste upotrebili neko slovo."));
+                    else if (rez == PovratneVrednostiAnagrama.NeispravnaRec)
+                        s.Send(Encoding.UTF8.GetBytes("NETACNO! Ta rec nije predlozena za ovaj anagram."));
+                    else
+                        s.Send(Encoding.UTF8.GetBytes("NETACNO!"));
+                }
+
+                Thread.Sleep(20);
+            }
+
+            foreach (var s in klijenti)
+            {
+                try
+                {
+                    var ig = mapa[s];
+                    s.Send(Encoding.UTF8.GetBytes($"KRAJ ANAGRAMA! Ukupno poeni: {ig.brojPoenaTrenutno}"));
+                }
+                catch { }
+            }
+
+            /*
+            foreach (var s in klijenti)
+            {
+                try { s.Shutdown(SocketShutdown.Both); } catch { }
+                try { s.Close(); } catch { }
+            }
+            */
+        }
+
+
+
+
+
     }
 }
