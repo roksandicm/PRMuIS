@@ -93,54 +93,142 @@ namespace Client
         {
             Socket tcpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 51002);
-            byte[] bufferRec = new byte[1024];
-            byte[] bufferSent = new byte[1024];
+            byte[] bufferRec = new byte[4096]; 
+            byte[] bufferSent;
             tcpSocket.Connect(ep);
 
             try
             {
+                
                 int recByte = tcpSocket.Receive(bufferRec);
                 string msg = Encoding.UTF8.GetString(bufferRec, 0, recByte);
                 Console.WriteLine(msg);
 
+                
                 string zaStart = "";
-                while (zaStart.ToUpper() != "START")
+                while (zaStart.Trim().ToUpper() != "START")
                 {
                     Console.Write("Unesite 'START' za pocetak: ");
                     zaStart = Console.ReadLine();
                 }
-                bufferSent = Encoding.UTF8.GetBytes(zaStart);
+                bufferSent = Encoding.UTF8.GetBytes(zaStart.Trim());
                 tcpSocket.Send(bufferSent);
 
+              
                 recByte = tcpSocket.Receive(bufferRec);
                 int brIgara = int.Parse(Encoding.UTF8.GetString(bufferRec, 0, recByte));
 
                 for (int i = 0; i < brIgara; i++)
                 {
+                   
                     recByte = tcpSocket.Receive(bufferRec);
-                    msg = Encoding.UTF8.GetString(bufferRec, 0, recByte);
+                    msg = Encoding.UTF8.GetString(bufferRec, 0, recByte).Trim();
                     Console.WriteLine($"\nIgra {i + 1}: {msg}");
 
+                  
                     if (msg == "ANAGRAM")
                     {
                         recByte = tcpSocket.Receive(bufferRec);
-                        string glavnaRec = Encoding.UTF8.GetString(bufferRec, 0, recByte);
+                        string glavnaRec = Encoding.UTF8.GetString(bufferRec, 0, recByte).Trim();
                         Console.WriteLine("Glavna reč: " + glavnaRec);
 
                         bool igraTraje = true;
                         while (igraTraje)
                         {
                             Console.Write("Unesite odgovor (ili 'ODUSTAJEM'/ 'KRAJ'): ");
-                            string odgovor = Console.ReadLine();
+                            string odgovor = Console.ReadLine().Trim();
+                            if (string.IsNullOrWhiteSpace(odgovor)) continue;
+
                             bufferSent = Encoding.UTF8.GetBytes(odgovor);
                             tcpSocket.Send(bufferSent);
 
                             recByte = tcpSocket.Receive(bufferRec);
-                            msg = Encoding.UTF8.GetString(bufferRec, 0, recByte);
+                            msg = Encoding.UTF8.GetString(bufferRec, 0, recByte).Trim();
                             Console.WriteLine(msg);
 
-                            if (msg.StartsWith("KRAJ ANAGRAMA") || msg.StartsWith("Odustali ste"))
+                            if (msg.ToUpper().Contains("KRAJ") || odgovor.ToUpper() == "KRAJ" || odgovor.ToUpper() == "ODUSTAJEM")
                                 igraTraje = false;
+                        }
+                    }
+
+                   
+                    if (msg == "PITANJA_IODGOVORI" || msg == "PIO")
+                    {
+                        Console.WriteLine("\n--- PITANJA I ODGOVORI ---\n");
+                        bool igraTraje = true;
+
+                        while (igraTraje)
+                        {
+                            recByte = tcpSocket.Receive(bufferRec);
+                            string pitanje = Encoding.UTF8.GetString(bufferRec, 0, recByte).Trim();
+
+                            if (pitanje.ToUpper().Contains("KRAJ"))
+                            {
+                                Console.WriteLine(pitanje);
+                                break;
+                            }
+
+                            Console.WriteLine(pitanje);
+
+                            string odgovor = "";
+                            while (true)
+                            {
+                                Console.Write("Odgovor (DA/NE): ");
+                                odgovor = Console.ReadLine().Trim().ToUpper();
+
+                                if (odgovor == "DA" || odgovor == "NE" || odgovor == "KRAJ" || odgovor == "ODUSTAJEM")
+                                    break;
+
+                                Console.WriteLine("Nevalidan unos!");
+                            }
+
+                            bufferSent = Encoding.UTF8.GetBytes(odgovor);
+                            tcpSocket.Send(bufferSent);
+
+                            recByte = tcpSocket.Receive(bufferRec);
+                            string rezultat = Encoding.UTF8.GetString(bufferRec, 0, recByte).Trim();
+                            Console.WriteLine(rezultat);
+
+                            if (rezultat.ToUpper().Contains("KRAJ"))
+                                igraTraje = false;
+                        }
+
+                        Console.WriteLine("\n--- Kraj PIO igre ---\n");
+                    }
+
+
+                    if (msg == "ASOCIJACIJE" || msg == "AS")
+                    {
+                        Console.WriteLine("\n--- ASOCIJACIJE ---\n");
+                        bool igraTraje = true;
+
+                        while (igraTraje)
+                        {
+                            recByte = tcpSocket.Receive(bufferRec);
+                            string stanje = Encoding.UTF8.GetString(bufferRec, 0, recByte).Trim();
+                            Console.WriteLine(stanje);
+
+                            Console.Write("Unesite potez (polje npr. A1, kolonu npr. A:resenje, konačno K:resenje ili KRAJ/ODUSTAJEM): ");
+                            string unos = Console.ReadLine().Trim();
+                            if (string.IsNullOrWhiteSpace(unos)) continue;
+
+                            tcpSocket.Send(Encoding.UTF8.GetBytes(unos));
+
+                            recByte = tcpSocket.Receive(bufferRec);
+                            string rezultat = Encoding.UTF8.GetString(bufferRec, 0, recByte).Trim();
+                            Console.WriteLine(rezultat);
+
+                            if (unos.StartsWith("K:", StringComparison.OrdinalIgnoreCase) ||
+                                unos.Equals("KRAJ", StringComparison.OrdinalIgnoreCase) ||
+                                unos.Equals("ODUSTAJEM", StringComparison.OrdinalIgnoreCase))
+                            {
+                                recByte = tcpSocket.Receive(bufferRec);
+                                string krajPoruka = Encoding.UTF8.GetString(bufferRec, 0, recByte).Trim();
+                                Console.WriteLine(krajPoruka);
+
+                                igraTraje = false;
+                                Console.WriteLine("\n--- Kraj ASOCIJACIJA ---\n");
+                            }
                         }
                     }
                 }

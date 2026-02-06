@@ -8,7 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Asocijacije\" />
     <Folder Include="FajloviZaIgre\Anagrami\" />
     <Folder Include="FajloviZaIgre\Asocijacije\" />
     <Folder Include="FajloviZaIgre\PiO\" />

@@ -1,6 +1,7 @@
 ﻿using Klase;
-using Klase.Igrac;
 using Klase.Anagram;
+using Klase.Igrac;
+using Klase.Pitanja_i_odgovori;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -219,6 +220,163 @@ namespace Projekat
 
                     igrac.SacuvajPoene(i);
                 }
+                else if (nazIgre == "pio")
+                {
+                    try
+                    {
+                        msg = "PITANJA_IODGOVORI";
+                        bufferSent = Encoding.UTF8.GetBytes(msg);
+                        acceptSocket.Send(bufferSent);
+
+                        string putanja = Path.Combine(baseDir, "FajloviZaIgre", "PiO", "pitanja.txt");
+                        PitanjaOdgovori igra = new PitanjaOdgovori(putanja);
+
+                        Console.WriteLine("Pokrenuta igra PITANJA I ODGOVORI");
+
+                        int maxPitanja = 8;
+                        int brojPitanja = 0;
+
+                        while (brojPitanja < maxPitanja && igra.PostaviSledecePitanje())
+                        {
+                            // šaljemo pitanje
+                            msg = igra.TekucePitanje;
+                            acceptSocket.Send(Encoding.UTF8.GetBytes(msg));
+
+                            // čekamo odgovor
+                            int br = acceptSocket.Receive(bufferRec);
+                            string odgovor = Encoding.UTF8.GetString(bufferRec, 0, br).Trim().ToUpper();
+
+                            Console.WriteLine($"Odgovor klijenta: {odgovor}");
+
+                            if (odgovor == "KRAJ" || odgovor == "ODUSTAJEM")
+                            {
+                                acceptSocket.Send(Encoding.UTF8.GetBytes(
+                                    $"KRAJ KVIZA! Poeni: {igrac.brojPoenaTrenutno}"
+                                ));
+                                break;
+                            }
+
+                            try
+                            {
+                                if (igra.ProveriOdgovor(odgovor))
+                                {
+                                    igrac.brojPoenaTrenutno += 4;
+                                    msg = "TAČNO! +4 poena";
+                                }
+                                else
+                                {
+                                    msg = $"NETAČNO! Tačan odgovor je {(igra.TacanOdgovor ? "DA" : "NE")}";
+                                }
+                            }
+                            catch (ArgumentException ex)
+                            {
+                                msg = ex.Message;
+                            }
+
+                            acceptSocket.Send(Encoding.UTF8.GetBytes(msg));
+                            brojPitanja++;
+                            Thread.Sleep(500);
+                        }
+
+                        acceptSocket.Send(Encoding.UTF8.GetBytes(
+                            $"KRAJ Pitanja I Odgovora! Ukupno poeni: {igrac.brojPoenaTrenutno}"
+                        ));
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("GRESKA U Pitanjima_I_Odgovorima IGRI: " + e.Message);
+                    }
+
+                    igrac.SacuvajPoene(i);
+                }
+                else if (nazIgre == "as")
+                {
+                    try
+                    {
+                        msg = "ASOCIJACIJE";
+                        bufferSent = Encoding.UTF8.GetBytes(msg);
+                        acceptSocket.Send(bufferSent);
+
+                        string putanja = Path.Combine(baseDir, "FajloviZaIgre", "Asocijacije", "asocijacije1.txt");
+                        Klase.Asocijacije.IgraAsocijacije igraAs = new Klase.Asocijacije.IgraAsocijacije();
+                        igraAs.UcitajAsocijaciju(putanja);
+
+                        bool igraTraje = true;
+                        while (igraTraje)
+                        {
+                           
+                            msg = igraAs.PrikaziStanje();
+                            bufferSent = Encoding.UTF8.GetBytes(msg);
+                            acceptSocket.Send(bufferSent);
+
+                           
+                            int bytesRecOdgovor = acceptSocket.Receive(bufferRec);
+                            string odgovor = Encoding.UTF8.GetString(bufferRec, 0, bytesRecOdgovor).Trim();
+
+                            
+                            if (odgovor.Equals("ODUSTAJEM", StringComparison.OrdinalIgnoreCase) ||
+                                odgovor.Equals("KRAJ", StringComparison.OrdinalIgnoreCase))
+                            {
+                                igrac.brojPoenaTrenutno += igraAs.GetPoeni();
+                                msg = $"Odustali ste ili je kraj igre! Ukupno poeni: {igrac.brojPoenaTrenutno}";
+                                bufferSent = Encoding.UTF8.GetBytes(msg);
+                                acceptSocket.Send(bufferSent);
+                                break;
+                            }
+
+                            bool validno = false;
+                            bool kraj = false;
+
+                          
+                            if (odgovor.Length == 2)
+                            {
+                                validno = igraAs.OtvoriPolje(odgovor);
+                            }
+                            
+                            else if (odgovor.Contains(":") && !odgovor.StartsWith("K:", StringComparison.OrdinalIgnoreCase))
+                            {
+                                validno = igraAs.PogodiKolonu(odgovor);
+                            }
+                            
+                            else if (odgovor.StartsWith("K:", StringComparison.OrdinalIgnoreCase))
+                            {
+                                validno = igraAs.PogodiKonacno(odgovor, out kraj);
+
+                                
+                                msg = igraAs.PrikaziStanje();
+                                bufferSent = Encoding.UTF8.GetBytes(msg);
+                                acceptSocket.Send(bufferSent);
+
+                                if (validno && kraj)
+                                {
+                                    
+                                    igrac.brojPoenaTrenutno = igraAs.GetPoeni();
+                                    msg = $"Čestitamo! Pogodili ste konačno rešenje! Ukupno poeni: {igrac.brojPoenaTrenutno}";
+                                    bufferSent = Encoding.UTF8.GetBytes(msg);
+                                    acceptSocket.Send(bufferSent);
+                                    break; 
+                                }
+                            }
+
+                            igrac.brojPoenaTrenutno = igraAs.GetPoeni();
+
+                            if (!odgovor.StartsWith("K:", StringComparison.OrdinalIgnoreCase))
+                            {
+                                msg = validno ? $"Poeni trenutno: {igrac.brojPoenaTrenutno}" : "Neispravan unos. Pokušajte ponovo.";
+                                bufferSent = Encoding.UTF8.GetBytes(msg);
+                                acceptSocket.Send(bufferSent);
+                            }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("GRESKA U ASOCIJACIJAMA: " + e.Message);
+                    }
+                    igrac.SacuvajPoene(i);
+                }
+
+
+
             }
 
             Console.WriteLine("\n-----------------------------------------------------------------\n");
