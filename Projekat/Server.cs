@@ -1,5 +1,6 @@
 ﻿using Klase;
 using Klase.Anagram;
+using Klase.Asocijacije;
 using Klase.Igrac;
 using Klase.Pitanja_i_odgovori;
 using System;
@@ -71,7 +72,7 @@ namespace Projekat
                             Thread.Sleep(1500);
                             Console.Clear();
 
-                            igraDvaIgraca(); 
+                            igraDvaIgraca();
                             break;
                         }
                         else
@@ -238,11 +239,9 @@ namespace Projekat
 
                         while (brojPitanja < maxPitanja && igra.PostaviSledecePitanje())
                         {
-                            // šaljemo pitanje
                             msg = igra.TekucePitanje;
                             acceptSocket.Send(Encoding.UTF8.GetBytes(msg));
 
-                            // čekamo odgovor
                             int br = acceptSocket.Receive(bufferRec);
                             string odgovor = Encoding.UTF8.GetString(bufferRec, 0, br).Trim().ToUpper();
 
@@ -304,68 +303,77 @@ namespace Projekat
                         bool igraTraje = true;
                         while (igraTraje)
                         {
-                           
                             msg = igraAs.PrikaziStanje();
-                            bufferSent = Encoding.UTF8.GetBytes(msg);
-                            acceptSocket.Send(bufferSent);
+                            acceptSocket.Send(Encoding.UTF8.GetBytes(msg));
 
-                           
                             int bytesRecOdgovor = acceptSocket.Receive(bufferRec);
                             string odgovor = Encoding.UTF8.GetString(bufferRec, 0, bytesRecOdgovor).Trim();
 
-                            
                             if (odgovor.Equals("ODUSTAJEM", StringComparison.OrdinalIgnoreCase) ||
                                 odgovor.Equals("KRAJ", StringComparison.OrdinalIgnoreCase))
                             {
                                 igrac.brojPoenaTrenutno += igraAs.GetPoeni();
-                                msg = $"Odustali ste ili je kraj igre! Ukupno poeni: {igrac.brojPoenaTrenutno}";
-                                bufferSent = Encoding.UTF8.GetBytes(msg);
-                                acceptSocket.Send(bufferSent);
+
+                                acceptSocket.Send(Encoding.UTF8.GetBytes(igraAs.PrikaziStanje()));
+
+                                acceptSocket.Send(Encoding.UTF8.GetBytes(
+                                    $"KRAJ ASOCIJACIJA! Ukupno poeni: {igrac.brojPoenaTrenutno}"
+                                ));
+
                                 break;
                             }
 
                             bool validno = false;
                             bool kraj = false;
+                            string statusPoruka = "";
 
-                          
                             if (odgovor.Length == 2)
                             {
                                 validno = igraAs.OtvoriPolje(odgovor);
+                                statusPoruka = validno ? "Otvoreno polje." : "Neispravan unos. Pokušajte ponovo.";
                             }
-                            
                             else if (odgovor.Contains(":") && !odgovor.StartsWith("K:", StringComparison.OrdinalIgnoreCase))
                             {
                                 validno = igraAs.PogodiKolonu(odgovor);
+                                statusPoruka = validno ? "Tačno! Pogodili ste kolonu." : "Netačno rešenje kolone.";
                             }
-                            
                             else if (odgovor.StartsWith("K:", StringComparison.OrdinalIgnoreCase))
                             {
                                 validno = igraAs.PogodiKonacno(odgovor, out kraj);
 
-                                
-                                msg = igraAs.PrikaziStanje();
-                                bufferSent = Encoding.UTF8.GetBytes(msg);
-                                acceptSocket.Send(bufferSent);
-
-                                if (validno && kraj)
-                                {
-                                    
-                                    igrac.brojPoenaTrenutno = igraAs.GetPoeni();
-                                    msg = $"Čestitamo! Pogodili ste konačno rešenje! Ukupno poeni: {igrac.brojPoenaTrenutno}";
-                                    bufferSent = Encoding.UTF8.GetBytes(msg);
-                                    acceptSocket.Send(bufferSent);
-                                    break; 
-                                }
+                                statusPoruka = validno
+                                    ? (kraj ? "Tačno! Pogodili ste konačno rešenje." : "Tačno.")
+                                    : "Netačno konačno rešenje.";
+                            }
+                            else
+                            {
+                                validno = false;
+                                statusPoruka = "Neispravan format unosa.";
                             }
 
                             igrac.brojPoenaTrenutno = igraAs.GetPoeni();
 
-                            if (!odgovor.StartsWith("K:", StringComparison.OrdinalIgnoreCase))
+                            if (odgovor.StartsWith("K:", StringComparison.OrdinalIgnoreCase))
                             {
-                                msg = validno ? $"Poeni trenutno: {igrac.brojPoenaTrenutno}" : "Neispravan unos. Pokušajte ponovo.";
-                                bufferSent = Encoding.UTF8.GetBytes(msg);
-                                acceptSocket.Send(bufferSent);
+                                acceptSocket.Send(Encoding.UTF8.GetBytes(igraAs.PrikaziStanje()));
+
+                                if (validno && kraj)
+                                {
+                                    acceptSocket.Send(Encoding.UTF8.GetBytes(
+                                        $"Čestitamo! {statusPoruka} Ukupno poeni: {igrac.brojPoenaTrenutno}"
+                                    ));
+                                    break;
+                                }
+
+                                acceptSocket.Send(Encoding.UTF8.GetBytes(
+                                    $"{statusPoruka} Poeni trenutno: {igrac.brojPoenaTrenutno}"
+                                ));
+                                continue;
                             }
+
+                            acceptSocket.Send(Encoding.UTF8.GetBytes(
+                                validno ? $"Poeni trenutno: {igrac.brojPoenaTrenutno}" : statusPoruka
+                            ));
                         }
                     }
                     catch (Exception e)
@@ -374,9 +382,6 @@ namespace Projekat
                     }
                     igrac.SacuvajPoene(i);
                 }
-
-
-
             }
 
             Console.WriteLine("\n-----------------------------------------------------------------\n");
@@ -406,7 +411,7 @@ namespace Projekat
                 if (mapa.Count < maxKlijenata && serverSocket.Poll(1000 * 1000, SelectMode.SelectRead))
                 {
                     Socket client = serverSocket.Accept();
-                    client.Blocking = true; 
+                    client.Blocking = true;
 
                     int n = 0;
                     try { n = client.Receive(buffer); } catch { n = 0; }
@@ -472,7 +477,7 @@ namespace Projekat
                         s.Send(Encoding.UTF8.GetBytes("ok_start"));
                     }
                 }
-                
+
                 if (mapa.Count == maxKlijenata && ready.Count == maxKlijenata && ready.Values.All(v => v))
                 {
                     Console.WriteLine("SERVER: Oba igraca spremna.");
@@ -484,10 +489,23 @@ namespace Projekat
                     Console.Clear();
 
                     var lista = new List<Socket>(mapa.Keys);
+
                     anagramDvaIgraca(lista, mapa);
 
+                    pioDvaIgraca(lista, mapa);
 
-                    while (true) Thread.Sleep(1000); //ukloniti za impl drugih igara
+                    asocijacijeDvaIgraca(lista, mapa);
+
+                    foreach (var s in lista)
+                    {
+                        try { s.Send(Encoding.UTF8.GetBytes("KRAJ_KVIZA")); } catch { }
+                        try { s.Shutdown(SocketShutdown.Both); } catch { }
+                        try { s.Close(); } catch { }
+                    }
+
+                    try { serverSocket.Close(); } catch { }
+                    Console.WriteLine("SERVER: Kviz zavrsen.");
+                    return;
                 }
 
                 Thread.Sleep(50);
@@ -558,7 +576,7 @@ namespace Projekat
                         zavrsio[s] = true;
                         foreach (var other in klijenti)
                             if (other != s && !zavrsio[other])
-                                other.Send(Encoding.UTF8.GetBytes($"{mapa[s].nickname} se diskonektovao (racuna se kao ODUSTAJEM)."));
+                                other.Send(Encoding.UTF8.GetBytes($"{mapa[s].nickname} se diskonektovao"));
                         continue;
                     }
 
@@ -572,12 +590,11 @@ namespace Projekat
                         rec.Equals("ODUSTAJEM", StringComparison.OrdinalIgnoreCase))
                     {
                         zavrsio[s] = true;
-                        s.Send(Encoding.UTF8.GetBytes("Zabelezeno: zavrsio si. Cekam da i drugi igrac posalje KRAJ/ODUSTAJEM."));
+                        s.Send(Encoding.UTF8.GetBytes($"Odustali ste. Vaši poeni: {ig.brojPoenaTrenutno}"));
 
                         foreach (var other in klijenti)
                             if (other != s && !zavrsio[other])
-                                other.Send(Encoding.UTF8.GetBytes($"Protivnik ({ig.nickname}) je zavrsio. Ti mozes nastaviti ili ukucaj KRAJ/ODUSTAJEM."));
-
+                                other.Send(Encoding.UTF8.GetBytes($"Protivnik ({ig.nickname}) je odustao. Vi igrate do kraja."));
                         continue;
                     }
 
@@ -647,8 +664,255 @@ namespace Projekat
             */
         }
 
+        static void pioDvaIgraca(List<Socket> klijenti, Dictionary<Socket, Igrac> mapa)
+        {
+            string putanja = Path.Combine(baseDir, "FajloviZaIgre", "PiO", "pitanja.txt");
 
+            Dictionary<Socket, PitanjaOdgovori> pioBySock = new Dictionary<Socket, PitanjaOdgovori>();
+            foreach (var s in klijenti)
+                pioBySock[s] = new PitanjaOdgovori(putanja);
 
+            foreach (var s in klijenti) s.Send(Encoding.UTF8.GetBytes("PITANJA_IODGOVORI"));
+
+            Console.WriteLine("=== MULTI PITANJA I ODGOVORI ===");
+
+            byte[] buf = new byte[1024];
+            int maxPitanja = 8;
+
+            Dictionary<Socket, int> brojPitanja = new Dictionary<Socket, int>();
+            Dictionary<Socket, bool> zavrsio = new Dictionary<Socket, bool>();
+            Dictionary<Socket, bool> cekaRezultat = new Dictionary<Socket, bool>();
+
+            foreach (var s in klijenti)
+            {
+                brojPitanja[s] = 0;
+                zavrsio[s] = false;
+                cekaRezultat[s] = false;
+
+                if (pioBySock[s].PostaviSledecePitanje())
+                {
+                    s.Send(Encoding.UTF8.GetBytes($"PITANJE|{pioBySock[s].TekucePitanje}"));
+                    brojPitanja[s]++;
+                }
+            }
+
+            while (true)
+            {
+                if (zavrsio.Values.All(x => x))
+                {
+                    break;
+                }
+
+                List<Socket> aktivni = new List<Socket>();
+                foreach (var s in klijenti)
+                    if (!zavrsio[s]) aktivni.Add(s);
+
+                if (aktivni.Count == 0) break;
+
+                Socket.Select(aktivni, null, null, 500 * 1000);
+
+                foreach (var s in aktivni)
+                {
+                    int n;
+                    try { n = s.Receive(buf); }
+                    catch { n = 0; }
+
+                    if (n == 0)
+                    {
+                        zavrsio[s] = true;
+                        continue;
+                    }
+
+                    string odgovor = Encoding.UTF8.GetString(buf, 0, n).Trim().ToUpper();
+                    Igrac ig = mapa[s];
+
+                    if (odgovor == "KRAJ" || odgovor == "ODUSTAJEM")
+                    {
+                        zavrsio[s] = true;
+                        s.Send(Encoding.UTF8.GetBytes($"REZULTAT|Odustali ste. Vaši poeni: {ig.brojPoenaTrenutno}"));
+
+                        foreach (var other in klijenti)
+                            if (other != s && !zavrsio[other])
+                                other.Send(Encoding.UTF8.GetBytes($"REZULTAT|Protivnik ({ig.nickname}) je odustao. Vi igrate do kraja."));
+                        continue;
+                    }
+
+                    string ishod = "";
+                    if (pioBySock[s].ProveriOdgovor(odgovor))
+                    {
+                        ig.brojPoenaTrenutno += 4;
+                        ishod = "REZULTAT|TAČNO! +4 poena";
+                    }
+                    else
+                    {
+                        string tacan = pioBySock[s].TacanOdgovor ? "DA" : "NE";
+                        ishod = $"REZULTAT|NETAČNO! Tačan odgovor je bio {tacan}";
+                    }
+
+                    s.Send(Encoding.UTF8.GetBytes(ishod));
+
+                    if (brojPitanja[s] < maxPitanja && pioBySock[s].PostaviSledecePitanje())
+                    {
+                        Thread.Sleep(200);
+                        s.Send(Encoding.UTF8.GetBytes($"PITANJE|{pioBySock[s].TekucePitanje}"));
+                        brojPitanja[s]++;
+                    }
+                    else
+                    {
+                        zavrsio[s] = true;
+                        s.Send(Encoding.UTF8.GetBytes($"REZULTAT|Završili ste svih {maxPitanja} pitanja."));
+                    }
+                }
+            }
+
+            foreach (var s in klijenti)
+            {
+                try
+                {
+                    Thread.Sleep(10);
+                    string finalMsg = $"KRAJ_PIO|Kraj Pitanja I Odgovora! Ukupno poena: {mapa[s].brojPoenaTrenutno}";
+                    s.Send(Encoding.UTF8.GetBytes(finalMsg));
+                }
+                catch { }
+            }
+
+            // Sinhronizacija
+            /*foreach (var s in klijenti)
+            {
+                try { s.Receive(buf); } catch { }
+            }*/
+        }
+
+        static void asocijacijeDvaIgraca(List<Socket> klijenti, Dictionary<Socket, Igrac> mapa)
+        {
+            string putanja = Path.Combine(baseDir, "FajloviZaIgre", "Asocijacije", "asocijacije1.txt");
+
+            IgraAsocijacije igraAs = new IgraAsocijacije();
+            igraAs.UcitajAsocijaciju(putanja);
+
+            void SendLine(Socket sock, string text)
+            {
+                try { sock.Send(Encoding.UTF8.GetBytes(text + "\n")); } catch { }
+            }
+
+            foreach (var s in klijenti) SendLine(s, "ASOCIJACIJE");
+
+            Console.WriteLine("=== MULTI ASOCIJACIJE ===");
+
+            int current = 0;
+            byte[] buf = new byte[4096];
+
+            Dictionary<Socket, int> poeniAs = new Dictionary<Socket, int>();
+            foreach (var s in klijenti) poeniAs[s] = 0;
+
+            int prevTotal = igraAs.GetPoeni();
+
+            while (true)
+            {
+                string stanje = igraAs.PrikaziStanje()
+                    .Replace("\r", "")
+                    .Replace("\n", "\\n");
+                foreach (var s in klijenti) SendLine(s, "STANJE|" + stanje);
+
+                Socket naPotezu = klijenti[current];
+                Socket ceka = klijenti[1 - current];
+
+                SendLine(naPotezu, "TVOJ_POTEZ|Unesite potez (A1, A:resenje, K:resenje, KRAJ/ODUSTAJEM):");
+                SendLine(ceka, $"CEKAJ|Na potezu je {mapa[naPotezu].nickname}.");
+
+                int n = 0;
+                try
+                {
+                    if (!naPotezu.Poll(120 * 1000 * 1000, SelectMode.SelectRead))
+                    {
+                        n = 0;
+                    }
+                    else
+                    {
+                        n = naPotezu.Receive(buf);
+                    }
+                }
+                catch
+                {
+                    n = 0;
+                }
+
+                if (n == 0)
+                {
+                    string msg = $"KRAJ_AS|Igrac {mapa[naPotezu].nickname} je odustao ili se diskonektovao. " +
+                                 $"As poeni: {mapa[klijenti[0]].nickname}={poeniAs[klijenti[0]]}, {mapa[klijenti[1]].nickname}={poeniAs[klijenti[1]]}.";
+                    foreach (var s in klijenti) SendLine(s, msg);
+                    return;
+                }
+
+                string potez = Encoding.UTF8.GetString(buf, 0, n).Trim();
+                if (string.IsNullOrWhiteSpace(potez))
+                {
+                    foreach (var s in klijenti) SendLine(s, "REZULTAT|Neispravan unos (prazno).");
+                    continue;
+                }
+
+                bool validno = false;
+                bool kraj = false;
+                string rezultatTekst = "";
+
+                if (potez.Equals("KRAJ", StringComparison.OrdinalIgnoreCase) ||
+                    potez.Equals("ODUSTAJEM", StringComparison.OrdinalIgnoreCase))
+                {
+                    string msg = $"KRAJ_AS|Igrac {mapa[naPotezu].nickname} je odustao. " +
+                                 $"As poeni: {mapa[klijenti[0]].nickname}={poeniAs[klijenti[0]]}, {mapa[klijenti[1]].nickname}={poeniAs[klijenti[1]]}.";
+                    foreach (var s in klijenti) SendLine(s, msg);
+                    return;
+                }
+
+                if (potez.Length == 2)
+                {
+                    validno = igraAs.OtvoriPolje(potez);
+                    rezultatTekst = validno ? "Otvoreno polje." : "Neispravan potez (polje).";
+                }
+                else if (potez.Contains(":") && !potez.StartsWith("K:", StringComparison.OrdinalIgnoreCase))
+                {
+                    validno = igraAs.PogodiKolonu(potez);
+                    rezultatTekst = validno ? "Tačno! Pogodjena kolona." : "Netačno rešenje kolone.";
+                }
+                else if (potez.StartsWith("K:", StringComparison.OrdinalIgnoreCase))
+                {
+                    validno = igraAs.PogodiKonacno(potez, out kraj);
+                    rezultatTekst = validno ? (kraj ? "Tačno! Pogodjeno konačno rešenje." : "Tačno.") : "Netačno konačno rešenje.";
+                }
+                else
+                {
+                    validno = false;
+                    rezultatTekst = "Neispravan format poteza.";
+                }
+
+                int afterTotal = igraAs.GetPoeni();
+                int gained = Math.Max(0, afterTotal - prevTotal);
+                prevTotal = afterTotal;
+
+                if (gained > 0)
+                {
+                    poeniAs[naPotezu] += gained;
+                    mapa[naPotezu].brojPoenaTrenutno += gained;
+                }
+
+                string rez = $"REZULTAT|{mapa[naPotezu].nickname}: {rezultatTekst}" +
+                             (gained > 0 ? $" (+{gained} poena)" : "");
+                foreach (var s in klijenti) SendLine(s, rez);
+
+                if (kraj && validno)
+                {
+                    string krajMsg =
+                        $"KRAJ_AS|Kraj Asocijacija! As poeni: {mapa[klijenti[0]].nickname}={poeniAs[klijenti[0]]}, " +
+                        $"{mapa[klijenti[1]].nickname}={poeniAs[klijenti[1]]}. Ukupno poena (kroz kviz): " +
+                        $"{mapa[klijenti[0]].nickname}={mapa[klijenti[0]].brojPoenaTrenutno}, {mapa[klijenti[1]].nickname}={mapa[klijenti[1]].brojPoenaTrenutno}.";
+                    foreach (var s in klijenti) SendLine(s, krajMsg);
+                    return;
+                }
+
+                current = 1 - current;
+            }
+        }
 
 
     }
