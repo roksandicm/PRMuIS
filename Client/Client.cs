@@ -65,7 +65,7 @@ namespace Client
                             Console.WriteLine("Zapocinjanje kviza...");
                             Thread.Sleep(1000);
                             Console.Clear();
-                            kviz(); 
+                            kviz();
                             gotGameOrTraining = true;
                             break;
                         }
@@ -93,18 +93,18 @@ namespace Client
         {
             Socket tcpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 51002);
-            byte[] bufferRec = new byte[4096]; 
+            byte[] bufferRec = new byte[4096];
             byte[] bufferSent;
             tcpSocket.Connect(ep);
 
             try
             {
-                
+
                 int recByte = tcpSocket.Receive(bufferRec);
                 string msg = Encoding.UTF8.GetString(bufferRec, 0, recByte);
                 Console.WriteLine(msg);
 
-                
+
                 string zaStart = "";
                 while (zaStart.Trim().ToUpper() != "START")
                 {
@@ -114,18 +114,18 @@ namespace Client
                 bufferSent = Encoding.UTF8.GetBytes(zaStart.Trim());
                 tcpSocket.Send(bufferSent);
 
-              
+
                 recByte = tcpSocket.Receive(bufferRec);
                 int brIgara = int.Parse(Encoding.UTF8.GetString(bufferRec, 0, recByte));
 
                 for (int i = 0; i < brIgara; i++)
                 {
-                   
+
                     recByte = tcpSocket.Receive(bufferRec);
                     msg = Encoding.UTF8.GetString(bufferRec, 0, recByte).Trim();
                     Console.WriteLine($"\nIgra {i + 1}: {msg}");
 
-                  
+
                     if (msg == "ANAGRAM")
                     {
                         recByte = tcpSocket.Receive(bufferRec);
@@ -151,7 +151,7 @@ namespace Client
                         }
                     }
 
-                   
+
                     if (msg == "PITANJA_IODGOVORI" || msg == "PIO")
                     {
                         Console.WriteLine("\n--- PITANJA I ODGOVORI ---\n");
@@ -247,7 +247,7 @@ namespace Client
             IPEndPoint TCPserverEP = new IPEndPoint(IPAddress.Loopback, 51002);
             TCPclientSocket.Connect(TCPserverEP);
 
-            byte[] buffer = new byte[2048];
+            byte[] buffer = new byte[8192];
 
             // TOKEN
             if (string.IsNullOrWhiteSpace(multiplayerToken))
@@ -295,19 +295,32 @@ namespace Client
 
             Console.WriteLine("\nKviz pocinje!\n");
 
-            for (int game = 0; game < 3; game++)
+            int game = 0;
+
+            while (true)
             {
                 br = TCPclientSocket.Receive(buffer);
-                if (br == 0) { Console.WriteLine("Server zatvorio konekciju."); TCPclientSocket.Close(); return; }
+                if (br == 0)
+                {
+                    Console.WriteLine("Server zatvorio konekciju.");
+                    break;
+                }
 
                 string igra = Encoding.UTF8.GetString(buffer, 0, br).Trim();
-                Console.WriteLine($"\n=== IGRA {game + 1}: {igra} ===\n");
+
+                if (igra.Equals("KRAJ_KVIZA", StringComparison.OrdinalIgnoreCase))
+                {
+                    break;
+                }
+
+                game++;
+                Console.WriteLine($"\n=== IGRA {game}: {igra} ===\n");
 
                 // ANAGRAM
                 if (igra.Equals("ANAGRAM", StringComparison.OrdinalIgnoreCase))
                 {
                     br = TCPclientSocket.Receive(buffer);
-                    if (br == 0) { Console.WriteLine("Server zatvorio konekciju."); TCPclientSocket.Close(); return; }
+                    if (br == 0) { Console.WriteLine("Server zatvorio konekciju."); break; }
 
                     string glavnaRec = Encoding.UTF8.GetString(buffer, 0, br).Trim();
                     Console.WriteLine("Glavna rec: " + glavnaRec);
@@ -324,7 +337,7 @@ namespace Client
                             if (string.IsNullOrWhiteSpace(unos)) continue;
 
                             try { TCPclientSocket.Send(Encoding.UTF8.GetBytes(unos)); }
-                            catch { Console.WriteLine("Pukla veza sa serverom."); TCPclientSocket.Close(); return; }
+                            catch { Console.WriteLine("Pukla veza sa serverom."); return; }
 
                             if (unos.Equals("kraj", StringComparison.OrdinalIgnoreCase) ||
                                 unos.Equals("odustajem", StringComparison.OrdinalIgnoreCase))
@@ -335,7 +348,7 @@ namespace Client
                         }
 
                         br = TCPclientSocket.Receive(buffer);
-                        if (br == 0) { Console.WriteLine("Server zatvorio konekciju."); TCPclientSocket.Close(); return; }
+                        if (br == 0) { Console.WriteLine("Server zatvorio konekciju."); return; }
 
                         string msg = Encoding.UTF8.GetString(buffer, 0, br).Trim();
                         Console.WriteLine(msg);
@@ -348,28 +361,155 @@ namespace Client
                     continue;
                 }
 
-                if (igra.Equals("PITANJA", StringComparison.OrdinalIgnoreCase) ||
-                    igra.Equals("PITANJA I ODGOVORI", StringComparison.OrdinalIgnoreCase) ||
-                    igra.Equals("PO", StringComparison.OrdinalIgnoreCase))
+                // PITANJA I ODGOVORI (PIO)
+                if (igra.Equals("PITANJA_IODGOVORI", StringComparison.OrdinalIgnoreCase) || igra.Equals("PIO", StringComparison.OrdinalIgnoreCase))
                 {
-                    Console.WriteLine("PO nije implementiran u klijentu jos. (stub)");
+                    bool jaZavrsio = false;
+
+                    while (true)
+                    {
+                        int nByte = TCPclientSocket.Receive(buffer);
+                        if (nByte == 0) break;
+
+                        string serverMsg = Encoding.UTF8.GetString(buffer, 0, nByte).Trim();
+                        string[] delovi = serverMsg.Split('|');
+                        string komanda = delovi[0];
+
+                        if (komanda == "PITANJE")
+                        {
+                            Console.WriteLine("\n" + delovi[1]);
+
+                            if (!jaZavrsio)
+                            {
+                                Console.Write("Vaš odgovor (DA/NE): ");
+                                string unos = Console.ReadLine().Trim().ToUpper();
+                                if (string.IsNullOrWhiteSpace(unos)) unos = " ";
+
+                                TCPclientSocket.Send(Encoding.UTF8.GetBytes(unos));
+
+                                if (unos == "KRAJ" || unos == "ODUSTAJEM")
+                                {
+                                    jaZavrsio = true;
+                                    Console.WriteLine("(Odustali ste. Čekate kraj partije...)");
+                                }
+                            }
+                        }
+                        else if (komanda == "REZULTAT")
+                        {
+                            Console.WriteLine(delovi[1]);
+                        }
+                        else if (komanda == "KRAJ_PIO")
+                        {
+                            Console.WriteLine("\n*******************************");
+                            Console.WriteLine(delovi[1]);
+                            Console.WriteLine("*******************************");
+
+                            //Console.WriteLine("\nPritisnite ENTER za potvrdu i nastavak...");
+                            //Console.ReadLine();
+
+                            // SINHRONIZACIJA
+                            //TCPclientSocket.Send(Encoding.UTF8.GetBytes("GOTOVO_PIO"));
+                            break;
+                        }
+                    }
+                    continue;
+
+
+                }
+
+
+
+
+
+                if (igra.Equals("ASOCIJACIJE", StringComparison.OrdinalIgnoreCase) || igra.Equals("AS", StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine("\n--- ASOCIJACIJE (MP) ---\n");
+
+                    string pending = "";
+                    string RecvLine()
+                    {
+                        while (true)
+                        {
+                            int nl = pending.IndexOf('\n');
+                            if (nl >= 0)
+                            {
+                                string line = pending.Substring(0, nl);
+                                pending = pending.Substring(nl + 1);
+                                return line.TrimEnd('\r');
+                            }
+
+                            int got = TCPclientSocket.Receive(buffer);
+                            if (got == 0) return null;
+                            pending += Encoding.UTF8.GetString(buffer, 0, got);
+                        }
+                    }
+
+                    while (true)
+                    {
+                        string serverMsg = RecvLine();
+                        if (serverMsg == null) { Console.WriteLine("Server zatvorio konekciju."); return; }
+                        serverMsg = serverMsg.Trim();
+
+                        if (!serverMsg.Contains("|"))
+                        {
+                            Console.WriteLine(serverMsg);
+                            continue;
+                        }
+
+                        string[] delovi = serverMsg.Split('|');
+                        string komanda = delovi[0];
+
+                        if (komanda == "STANJE")
+                        {
+                            string stanje = serverMsg.Substring("STANJE|".Length).Replace("\\n", "\n");
+                            Console.WriteLine(stanje);
+                        }
+                        else if (komanda == "REZULTAT")
+                        {
+                            Console.WriteLine(delovi.Length > 1 ? delovi[1] : "");
+                        }
+                        else if (komanda == "CEKAJ")
+                        {
+                            Console.WriteLine(delovi.Length > 1 ? delovi[1] : "Cekaj...");
+                        }
+                        else if (komanda == "TVOJ_POTEZ")
+                        {
+                            Console.WriteLine(delovi.Length > 1 ? delovi[1] : "Tvoj potez:");
+
+                            Console.Write("> ");
+                            string unos = Console.ReadLine().Trim();
+                            if (string.IsNullOrWhiteSpace(unos)) unos = " ";
+
+                            TCPclientSocket.Send(Encoding.UTF8.GetBytes(unos + "\n"));
+                        }
+                        else if (komanda == "KRAJ_AS")
+                        {
+                            Console.WriteLine("\n*******************************");
+                            Console.WriteLine(delovi.Length > 1 ? delovi[1] : "Kraj Asocijacija.");
+                            Console.WriteLine("*******************************\n");
+                            break;
+                        }
+                        else
+                        {
+                            Console.WriteLine(serverMsg);
+                        }
+                    }
+
+
+                    Console.WriteLine("\n--- Kraj ASOCIJACIJA (MP) ---\n");
+                    Thread.Sleep(1000);
                     continue;
                 }
 
-                if (igra.Equals("ASOCIJACIJE", StringComparison.OrdinalIgnoreCase) ||
-                    igra.Equals("AS", StringComparison.OrdinalIgnoreCase))
-                {
-                    Console.WriteLine("AS nije implementiran u klijentu jos. (stub)");
-                    continue;
-                }
-
-                Console.WriteLine("Nepoznata igra: " + igra);
+                //Console.WriteLine("Nepoznata ili neimplementirana igra: " + igra);
             }
 
+
+
             Console.WriteLine("\nKviz zavrsen!\n");
+            Thread.Sleep(1000);
             TCPclientSocket.Close();
         }
-
 
 
 
