@@ -9,15 +9,15 @@ namespace Klase.Igrac
     [Serializable]
     public class Igrac
     {
-        public int id { get;}
-        public string nickname { get;}
+        public int id { get; }
+        public string nickname { get; }
 
-        public int brojIgre { get; private set; } // broj igara
-        public int brojPoenaTrenutno { get;  set; } // trenutno stanje unutar igre
+        public int brojIgre { get; private set; }
+        public int brojPoenaTrenutno { get; set; }
 
         private List<bool> penalties = new List<bool>();
 
-        private int [] poeniUIgri; // koliko je dobijeno poena u igri
+        private int[] poeniUIgri;
 
         private string[] igre;
 
@@ -35,7 +35,7 @@ namespace Klase.Igrac
 
         public Igrac(string nickname)
         {
-            id = new Random().Next(0,1000);
+            id = new Random().Next(0, 1000);
             this.nickname = nickname;
             this.brojIgre = 3;
             this.brojPoenaTrenutno = 0;
@@ -60,7 +60,7 @@ namespace Klase.Igrac
             int poeni = brojPoenaTrenutno * (indexIgre == IndexKvisko ? 2 : 1);
 
             if (indexIgre == IndexKvisko)
-                PoeniKvisko = poeni;
+                PoeniKvisko += poeni;
 
             poeniUIgri[indexIgre] = poeni;
             brojPoenaTrenutno = 0;
@@ -69,12 +69,22 @@ namespace Klase.Igrac
 
         public bool UloziKviska(int indexIgre)
         {
-            if (kvisko) 
-            return false;
+            if (kvisko)
+                return false;
 
             kvisko = true;
             IndexKvisko = indexIgre;
             return true;
+        }
+
+
+        public void DodajPoene(int poeni, int indexIgre)
+        {
+            int dodatno = poeni * (indexIgre == IndexKvisko ? 2 : 1);
+            brojPoenaTrenutno += dodatno;
+
+            if (indexIgre == IndexKvisko)
+                PoeniKvisko += dodatno;
         }
 
         public int GetUkupnoPoena()

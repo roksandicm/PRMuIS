@@ -123,7 +123,8 @@ namespace Client
 
                     recByte = tcpSocket.Receive(bufferRec);
                     msg = Encoding.UTF8.GetString(bufferRec, 0, recByte).Trim();
-                    Console.WriteLine($"\nIgra {i + 1}: {msg}");
+
+                    Console.WriteLine($"Igra {i + 1}: {msg}");
 
 
                     if (msg == "ANAGRAM")
@@ -307,6 +308,27 @@ namespace Client
                 }
 
                 string igra = Encoding.UTF8.GetString(buffer, 0, br).Trim();
+
+                // Ulaganje Kviska (server salje KVISKO|...)
+                if (igra.StartsWith("KVISKO|", StringComparison.OrdinalIgnoreCase))
+                {
+                    string tekst = igra.Substring("KVISKO|".Length);
+                    Console.WriteLine("" + tekst);
+
+                    if (!tekst.Contains("Vec ste ulozili", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string ans;
+                        do
+                        {
+                            Console.Write("Odgovor: ");
+                            ans = Console.ReadLine().Trim().ToLower();
+                        } while (ans != "hocu" && ans != "necu");
+
+                        try { TCPclientSocket.Send(Encoding.UTF8.GetBytes(ans)); } catch { }
+                    }
+
+                    continue;
+                }
 
                 if (igra.Equals("KRAJ_KVIZA", StringComparison.OrdinalIgnoreCase))
                 {
@@ -507,7 +529,7 @@ namespace Client
 
 
             Console.WriteLine("\nKviz zavrsen!\n");
-            Thread.Sleep(1000);
+            Thread.Sleep(4000);
             TCPclientSocket.Close();
         }
 

@@ -139,6 +139,7 @@ namespace Projekat
 
             for (int i = 0; i < igrac.brojIgre; i++)
             {
+
                 string nazIgre = igrac.GetIgra(i);
                 if (nazIgre == "an")
                 {
@@ -490,9 +491,18 @@ namespace Projekat
 
                     var lista = new List<Socket>(mapa.Keys);
 
+                    var ulaganje = new UlaganjeKviska(mapa[lista[0]], mapa[lista[1]]);
+
+
+                    ulaganje.UloziKviska(lista, 0);
+
                     anagramDvaIgraca(lista, mapa);
 
+                    ulaganje.UloziKviska(lista, 1);
+
                     pioDvaIgraca(lista, mapa);
+
+                    ulaganje.UloziKviska(lista, 2);
 
                     asocijacijeDvaIgraca(lista, mapa);
 
@@ -527,7 +537,7 @@ namespace Projekat
             foreach (var s in klijenti) s.Send(Encoding.UTF8.GetBytes(glavna));
 
             Console.WriteLine("=== MULTI ANAGRAM ===");
-            Console.WriteLine("Glavna rec: " + glavna);
+            //Console.WriteLine("Glavna rec: " + glavna);
 
             byte[] buf = new byte[1024];
 
@@ -584,7 +594,7 @@ namespace Projekat
                     if (string.IsNullOrWhiteSpace(rec)) continue;
 
                     Igrac ig = mapa[s];
-                    Console.WriteLine($"{ig.nickname}: {rec}");
+                    //Console.WriteLine($"{ig.nickname}: {rec}");
 
                     if (rec.Equals("KRAJ", StringComparison.OrdinalIgnoreCase) ||
                         rec.Equals("ODUSTAJEM", StringComparison.OrdinalIgnoreCase))
@@ -613,7 +623,7 @@ namespace Projekat
                             prviPogodio[key] = s;
                             pogodjeneBarJednom++;
 
-                            ig.brojPoenaTrenutno += poeni;
+                            ig.DodajPoene(poeni, 0);
                             s.Send(Encoding.UTF8.GetBytes($"TACNO! +{poeni} (prvi). {pogodjeneBarJednom}/{ukupno}"));
                         }
                         else if (brojBodovanja[key] == 1 && prviPogodio[key] != s)
@@ -621,7 +631,7 @@ namespace Projekat
                             int poeni2 = (int)Math.Floor(poeni * 0.85);
                             brojBodovanja[key] = 2;
 
-                            ig.brojPoenaTrenutno += poeni2;
+                            ig.DodajPoene(poeni2, 0);
                             s.Send(Encoding.UTF8.GetBytes($"TACNO, ali kasnije! +{poeni2} (15% manje)."));
                         }
                         else
@@ -740,7 +750,7 @@ namespace Projekat
                     string ishod = "";
                     if (pioBySock[s].ProveriOdgovor(odgovor))
                     {
-                        ig.brojPoenaTrenutno += 4;
+                        ig.DodajPoene(4, 1);
                         ishod = "REZULTAT|TAČNO! +4 poena";
                     }
                     else
@@ -839,7 +849,7 @@ namespace Projekat
 
                 if (n == 0)
                 {
-                    string msg = $"KRAJ_AS|Igrac {mapa[naPotezu].nickname} je odustao ili se diskonektovao. " +
+                    string msg = $"KRAJ_AS|Igrac {mapa[naPotezu].nickname} je odustao ili se diskonektovao." +
                                  $"As poeni: {mapa[klijenti[0]].nickname}={poeniAs[klijenti[0]]}, {mapa[klijenti[1]].nickname}={poeniAs[klijenti[1]]}.";
                     foreach (var s in klijenti) SendLine(s, msg);
                     return;
@@ -859,8 +869,10 @@ namespace Projekat
                 if (potez.Equals("KRAJ", StringComparison.OrdinalIgnoreCase) ||
                     potez.Equals("ODUSTAJEM", StringComparison.OrdinalIgnoreCase))
                 {
-                    string msg = $"KRAJ_AS|Igrac {mapa[naPotezu].nickname} je odustao. " +
-                                 $"As poeni: {mapa[klijenti[0]].nickname}={poeniAs[klijenti[0]]}, {mapa[klijenti[1]].nickname}={poeniAs[klijenti[1]]}.";
+                    string msg =
+                        $"KRAJ_AS|Kraj Asocijacija! As poeni: {mapa[klijenti[0]].nickname}={poeniAs[klijenti[0]]}, " +
+                        $"{mapa[klijenti[1]].nickname}={poeniAs[klijenti[1]]}. Ukupno poena (kroz kviz): " +
+                        $"{mapa[klijenti[0]].nickname}={mapa[klijenti[0]].brojPoenaTrenutno}, {mapa[klijenti[1]].nickname}={mapa[klijenti[1]].brojPoenaTrenutno}.";
                     foreach (var s in klijenti) SendLine(s, msg);
                     return;
                 }
@@ -892,12 +904,13 @@ namespace Projekat
 
                 if (gained > 0)
                 {
-                    poeniAs[naPotezu] += gained;
-                    mapa[naPotezu].brojPoenaTrenutno += gained;
+                    int primenjeni = gained * (mapa[naPotezu].IndexKvisko == 2 ? 2 : 1);
+                    poeniAs[naPotezu] += primenjeni;
+                    mapa[naPotezu].DodajPoene(gained, 2);
                 }
 
                 string rez = $"REZULTAT|{mapa[naPotezu].nickname}: {rezultatTekst}" +
-                             (gained > 0 ? $" (+{gained} poena)" : "");
+                             (gained > 0 ? $" (+{(mapa[naPotezu].IndexKvisko == 2 ? gained * 2 : gained)} poena)" : "");
                 foreach (var s in klijenti) SendLine(s, rez);
 
                 if (kraj && validno)
