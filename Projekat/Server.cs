@@ -873,6 +873,30 @@ namespace Projekat
                         $"KRAJ_AS|Kraj Asocijacija! As poeni: {mapa[klijenti[0]].nickname}={poeniAs[klijenti[0]]}, " +
                         $"{mapa[klijenti[1]].nickname}={poeniAs[klijenti[1]]}. Ukupno poena (kroz kviz): " +
                         $"{mapa[klijenti[0]].nickname}={mapa[klijenti[0]].brojPoenaTrenutno}, {mapa[klijenti[1]].nickname}={mapa[klijenti[1]].brojPoenaTrenutno}.";
+                    var ig1 = mapa[klijenti[0]];
+                    var ig2 = mapa[klijenti[1]];
+                    if (ig1.brojPoenaTrenutno > ig2.brojPoenaTrenutno)
+                    {
+                        msg += $"\tPobednik je {ig1.nickname}!";
+                    }
+                    else if (ig1.brojPoenaTrenutno < ig2.brojPoenaTrenutno)
+                    {
+                        msg += $"\tPobednik je {ig2.nickname}!";
+                    }
+                    else
+                    {
+                        if (ig1.IndexKvisko != -1 && ig2.IndexKvisko == -1)
+                        {
+                            msg += $"\tPobednik je {ig1.nickname}!";
+                        }
+                        else if (ig1.IndexKvisko == -1 && ig2.IndexKvisko != -1)
+                        {
+                            msg += $"\tPobednik je {ig2.nickname}!";
+                        }else
+                        {
+                            msg += $"\tNeresno!";
+                        }
+                    }
                     foreach (var s in klijenti) SendLine(s, msg);
                     return;
                 }
@@ -919,7 +943,30 @@ namespace Projekat
                         $"KRAJ_AS|Kraj Asocijacija! As poeni: {mapa[klijenti[0]].nickname}={poeniAs[klijenti[0]]}, " +
                         $"{mapa[klijenti[1]].nickname}={poeniAs[klijenti[1]]}. Ukupno poena (kroz kviz): " +
                         $"{mapa[klijenti[0]].nickname}={mapa[klijenti[0]].brojPoenaTrenutno}, {mapa[klijenti[1]].nickname}={mapa[klijenti[1]].brojPoenaTrenutno}.";
-                    foreach (var s in klijenti) SendLine(s, krajMsg);
+                    var ig1 = mapa[klijenti[0]];
+                    var ig2 = mapa[klijenti[1]];
+                    if (ig1.brojPoenaTrenutno > ig2.brojPoenaTrenutno)
+                    {
+                        krajMsg += $"\tPobednik je {ig1.nickname}!";
+                    }
+                    else if(ig1.brojPoenaTrenutno < ig2.brojPoenaTrenutno)
+                    {
+                        krajMsg += $"\tPobednik je {ig2.nickname}!";
+                    }
+                    else
+                    {
+                        if(ig1.IndexKvisko != -1 && ig2.IndexKvisko == -1)
+                        {
+                            krajMsg += $"\tPobednik je {ig1.nickname}!";
+                        }else if (ig1.IndexKvisko == -1 && ig2.IndexKvisko != -1)
+                        {
+                            krajMsg += $"\tPobednik je {ig2.nickname}!";
+                        }else
+                        {
+                            krajMsg += $"\tNereseno!";
+                        }
+                    }
+                        foreach (var s in klijenti) SendLine(s, krajMsg);
                     return;
                 }
 
